@@ -54,12 +54,12 @@ public class Main extends JFrame {
 
         // 검색 조건 패널 설정
         JPanel searchPanel = new JPanel(new FlowLayout());
-        searchCategoryBox = new JComboBox<>(new String[]{"전체", "부서", "성별", "급여", "평균 월급"});
+        searchCategoryBox = new JComboBox<>(new String[]{"전체", "부서", "성별", "급여", "주소", "상사 주민번호", "생년월일", "이름", "주민번호", "평균 월급"});
         groupByBox = new JComboBox<>(new String[]{"그룹 없음", "성별", "부서", "상급자"});
         departmentComboBox = new JComboBox<>(getDepartments()); // 부서 선택을 위한 콤보박스
         genderComboBox = new JComboBox<>(new String[]{"M", "F"}); // 성별 선택을 위한 콤보박스
         salaryField = new JTextField(10);
-        salaryField.setEnabled(false); // 급여 검색 필드는 기본적으로 비활성화
+        salaryField.setEnabled(false); // 검색 조건 필드는 기본적으로 비활성화
 
         searchButton = new JButton("검색");
         deleteButton = new JButton("선택된 직원 삭제");
@@ -128,7 +128,7 @@ public class Main extends JFrame {
         switch (selectedCategory) {
             case "부서" -> departmentComboBox.setEnabled(true);
             case "성별" -> genderComboBox.setEnabled(true);
-            case "급여" -> salaryField.setEnabled(true);
+            case "급여", "주소", "상사 주민번호", "생년월일", "이름", "주민번호" -> salaryField.setEnabled(true);
             case "평균 월급" -> groupByBox.setEnabled(true);
         }
     }
@@ -176,6 +176,7 @@ public class Main extends JFrame {
             e.printStackTrace();
         }
     }
+
     /**
      * 조건에 따라 직원 데이터를 검색하고 테이블에 표시하는 메서드
      */
@@ -184,49 +185,75 @@ public class Main extends JFrame {
         String groupBy = groupByBox.getSelectedItem().toString();
         String query = null;
 
-        if ("부서".equals(category)) {
-            query = """
-            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-            WHERE d.Dname = ?;
-            """;
-        } else if ("성별".equals(category)) {
-            query = """
-            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-            WHERE e.Sex = ?;
-            """;
-        } else if ("급여".equals(category)) {
-            query = """
-            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-            WHERE e.Salary >= ?;
-            """;
-        } else if ("평균 월급".equals(category)) {
-            if ("상급자".equals(groupBy)) {
-                query = """
-                SELECT CONCAT(s.Fname, ' ', s.Minit, ' ', s.Lname) AS Supervisor, AVG(e.Salary) AS AvgSalary
-                FROM EMPLOYEE e
-                JOIN EMPLOYEE s ON e.Super_ssn = s.Ssn
-                GROUP BY e.Super_ssn;
+        switch (category) {
+            case "부서" -> query = """
+                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                WHERE d.Dname = ?;
                 """;
-            } else if ("성별".equals(groupBy)) {
-                query = """
-                SELECT e.Sex AS GroupCategory, AVG(e.Salary) AS AvgSalary
-                FROM EMPLOYEE e
-                GROUP BY e.Sex;
+            case "성별" -> query = """
+                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                WHERE e.Sex = ?;
                 """;
-            } else if ("부서".equals(groupBy)) {
-                query = """
-                SELECT d.Dname AS GroupCategory, AVG(e.Salary) AS AvgSalary
-                FROM EMPLOYEE e
-                JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                GROUP BY d.Dname;
+            case "급여" -> query = """
+                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                WHERE e.Salary >= ?;
                 """;
+            case "주소" -> query = """
+                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                WHERE e.Address LIKE ?;
+                """;
+            case "상사 주민번호" -> query = """
+                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                WHERE e.Super_ssn = ?;
+                """;
+            case "생년월일" -> query = """
+                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                WHERE e.Bdate = ?;
+                """;
+            case "이름" -> query = """
+                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                WHERE CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) LIKE ?;
+                """;
+            case "주민번호" -> query = """
+                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                WHERE e.Ssn = ?;
+                """;
+            case "평균 월급" -> {
+                if ("상급자".equals(groupBy)) {
+                    query = """
+                    SELECT CONCAT(s.Fname, ' ', s.Minit, ' ', s.Lname) AS Supervisor, AVG(e.Salary) AS AvgSalary
+                    FROM EMPLOYEE e
+                    JOIN EMPLOYEE s ON e.Super_ssn = s.Ssn
+                    WHERE e.Super_ssn = ?
+                    GROUP BY e.Super_ssn;
+                    """;
+                } else if ("성별".equals(groupBy)) {
+                    query = """
+                    SELECT e.Sex AS GroupCategory, AVG(e.Salary) AS AvgSalary
+                    FROM EMPLOYEE e
+                    GROUP BY e.Sex;
+                    """;
+                } else if ("부서".equals(groupBy)) {
+                    query = """
+                    SELECT d.Dname AS GroupCategory, AVG(e.Salary) AS AvgSalary
+                    FROM EMPLOYEE e
+                    JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                    GROUP BY d.Dname;
+                    """;
+                }
             }
-        } else {
-            loadEmployeeData();
-            return;
+            default -> {
+                loadEmployeeData();
+                return;
+            }
         }
 
         if (query != null) {
@@ -234,17 +261,16 @@ public class Main extends JFrame {
             try (Connection conn = DatabaseConnection.getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(query)) {
 
-                if ("부서".equals(category)) {
-                    pstmt.setString(1, departmentComboBox.getSelectedItem().toString());
-                } else if ("성별".equals(category)) {
-                    pstmt.setString(1, genderComboBox.getSelectedItem().toString());
-                } else if ("급여".equals(category)) {
-                    pstmt.setDouble(1, Double.parseDouble(salaryField.getText()));
+                switch (category) {
+                    case "부서" -> pstmt.setString(1, departmentComboBox.getSelectedItem().toString());
+                    case "성별" -> pstmt.setString(1, genderComboBox.getSelectedItem().toString());
+                    case "급여", "상사 주민번호", "생년월일", "이름", "주민번호" -> pstmt.setString(1, salaryField.getText());
+                    case "주소" -> pstmt.setString(1, "%" + salaryField.getText() + "%");
                 }
 
                 ResultSet rs = pstmt.executeQuery();
                 while (rs.next()) {
-                    if ("평균 월급".equals(category)) {
+                    if ("평균 월급".equals(category) && !"그룹 없음".equals(groupBy)) {
                         if ("상급자".equals(groupBy)) {
                             model.addRow(new Object[]{false, rs.getString("Supervisor"), rs.getDouble("AvgSalary")});
                         } else {
@@ -264,7 +290,6 @@ public class Main extends JFrame {
         }
     }
 
-
     /**
      * 체크된 직원들을 삭제하는 메서드
      */
@@ -274,7 +299,7 @@ public class Main extends JFrame {
         for (int i = 0; i < model.getRowCount(); i++) {
             Boolean isSelected = (Boolean) model.getValueAt(i, 0);
             if (isSelected) {
-                String ssn = model.getValueAt(i, 2).toString(); // "주민번호"가 2번째 컬럼
+                String ssn = model.getValueAt(i, 2).toString();
                 ssnsToDelete.add(ssn);
             }
         }
@@ -394,7 +419,6 @@ public class Main extends JFrame {
         JTextField salaryField = new JTextField(model.getValueAt(selectedRow, 6).toString());
         JTextField superSsnField = new JTextField(model.getValueAt(selectedRow, 7).toString());
 
-        // 부서를 이름으로 선택할 수 있는 콤보박스
         JComboBox<String> dnoComboBox = new JComboBox<>(getDepartments());
         dnoComboBox.setSelectedItem(model.getValueAt(selectedRow, 8).toString());
 
@@ -435,7 +459,6 @@ public class Main extends JFrame {
                     return;
                 }
 
-                // 선택된 부서 이름을 부서 번호로 변환
                 String selectedDepartment = (String) dnoComboBox.getSelectedItem();
                 int departmentNumber = getDepartmentNumber(selectedDepartment);
 
@@ -496,7 +519,7 @@ public class Main extends JFrame {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return -1; // 부서를 찾지 못한 경우 -1 반환
+        return -1;
     }
 
     public static void main(String[] args) {
