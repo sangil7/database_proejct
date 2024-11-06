@@ -88,6 +88,8 @@ public class Main extends JFrame {
         add(new JScrollPane(table), BorderLayout.CENTER);
 
         searchCategoryBox.addActionListener(e -> updateSearchOptions());
+        groupByBox.addActionListener(e -> updateSearchOptions());
+
 
         searchButton.addActionListener(e -> searchEmployees());
         deleteButton.addActionListener(e -> deleteEmployees());
@@ -118,8 +120,13 @@ public class Main extends JFrame {
      * 검색 옵션 업데이트
      * 선택된 검색 범위에 따라 적절한 검색 조건 필드를 활성화/비활성화
      */
+    /**
+     * 검색 옵션 업데이트
+     * 선택된 검색 범위에 따라 적절한 검색 조건 필드를 활성화/비활성화
+     */
     private void updateSearchOptions() {
         String selectedCategory = (String) searchCategoryBox.getSelectedItem();
+        String selectedGroupBy = (String) groupByBox.getSelectedItem();
         departmentComboBox.setEnabled(false);
         genderComboBox.setEnabled(false);
         salaryField.setEnabled(false);
@@ -129,9 +136,15 @@ public class Main extends JFrame {
             case "부서" -> departmentComboBox.setEnabled(true);
             case "성별" -> genderComboBox.setEnabled(true);
             case "급여", "주소", "상사 주민번호", "생년월일", "이름", "주민번호" -> salaryField.setEnabled(true);
-            case "평균 월급" -> groupByBox.setEnabled(true);
+            case "평균 월급" -> {
+                groupByBox.setEnabled(true);
+                if ("상급자".equals(selectedGroupBy)) {
+                    salaryField.setEnabled(true);
+                }
+            }
         }
     }
+
 
     /**
      * 테이블의 열을 설정하는 메서드
@@ -187,67 +200,67 @@ public class Main extends JFrame {
 
         switch (category) {
             case "부서" -> query = """
-                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                WHERE d.Dname = ?;
-                """;
+            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+            WHERE d.Dname = ?;
+            """;
             case "성별" -> query = """
-                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                WHERE e.Sex = ?;
-                """;
+            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+            WHERE e.Sex = ?;
+            """;
             case "급여" -> query = """
-                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                WHERE e.Salary >= ?;
-                """;
+            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+            WHERE e.Salary >= ?;
+            """;
             case "주소" -> query = """
-                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                WHERE e.Address LIKE ?;
-                """;
+            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+            WHERE e.Address LIKE ?;
+            """;
             case "상사 주민번호" -> query = """
-                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                WHERE e.Super_ssn = ?;
-                """;
+            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+            WHERE e.Super_ssn = ?;
+            """;
             case "생년월일" -> query = """
-                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                WHERE e.Bdate = ?;
-                """;
+            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+            WHERE e.Bdate = ?;
+            """;
             case "이름" -> query = """
-                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                WHERE CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) LIKE ?;
-                """;
+            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+            WHERE CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) LIKE ?;
+            """;
             case "주민번호" -> query = """
-                SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
-                FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                WHERE e.Ssn = ?;
-                """;
+            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department
+            FROM EMPLOYEE e JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+            WHERE e.Ssn = ?;
+            """;
             case "평균 월급" -> {
                 if ("상급자".equals(groupBy)) {
                     query = """
-                    SELECT CONCAT(s.Fname, ' ', s.Minit, ' ', s.Lname) AS Supervisor, AVG(e.Salary) AS AvgSalary
-                    FROM EMPLOYEE e
-                    JOIN EMPLOYEE s ON e.Super_ssn = s.Ssn
-                    WHERE e.Super_ssn = ?
-                    GROUP BY e.Super_ssn;
-                    """;
+                SELECT CONCAT(s.Fname, ' ', s.Minit, ' ', s.Lname) AS Supervisor, AVG(e.Salary) AS AvgSalary
+                FROM EMPLOYEE e
+                JOIN EMPLOYEE s ON e.Super_ssn = s.Ssn
+                WHERE e.Super_ssn = ?
+                GROUP BY e.Super_ssn;
+                """;
                 } else if ("성별".equals(groupBy)) {
                     query = """
-                    SELECT e.Sex AS GroupCategory, AVG(e.Salary) AS AvgSalary
-                    FROM EMPLOYEE e
-                    GROUP BY e.Sex;
-                    """;
+                SELECT e.Sex AS GroupCategory, AVG(e.Salary) AS AvgSalary
+                FROM EMPLOYEE e
+                GROUP BY e.Sex;
+                """;
                 } else if ("부서".equals(groupBy)) {
                     query = """
-                    SELECT d.Dname AS GroupCategory, AVG(e.Salary) AS AvgSalary
-                    FROM EMPLOYEE e
-                    JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-                    GROUP BY d.Dname;
-                    """;
+                SELECT d.Dname AS GroupCategory, AVG(e.Salary) AS AvgSalary
+                FROM EMPLOYEE e
+                JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+                GROUP BY d.Dname;
+                """;
                 }
             }
             default -> {
@@ -261,11 +274,15 @@ public class Main extends JFrame {
             try (Connection conn = DatabaseConnection.getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(query)) {
 
-                switch (category) {
-                    case "부서" -> pstmt.setString(1, departmentComboBox.getSelectedItem().toString());
-                    case "성별" -> pstmt.setString(1, genderComboBox.getSelectedItem().toString());
-                    case "급여", "상사 주민번호", "생년월일", "이름", "주민번호" -> pstmt.setString(1, salaryField.getText());
-                    case "주소" -> pstmt.setString(1, "%" + salaryField.getText() + "%");
+                if ("평균 월급".equals(category) && "상급자".equals(groupBy)) {
+                    pstmt.setString(1, salaryField.getText());
+                } else {
+                    switch (category) {
+                        case "부서" -> pstmt.setString(1, departmentComboBox.getSelectedItem().toString());
+                        case "성별" -> pstmt.setString(1, genderComboBox.getSelectedItem().toString());
+                        case "급여", "상사 주민번호", "생년월일", "이름", "주민번호" -> pstmt.setString(1, salaryField.getText());
+                        case "주소" -> pstmt.setString(1, "%" + salaryField.getText() + "%");
+                    }
                 }
 
                 ResultSet rs = pstmt.executeQuery();
@@ -289,6 +306,7 @@ public class Main extends JFrame {
             }
         }
     }
+
 
     /**
      * 체크된 직원들을 삭제하는 메서드
