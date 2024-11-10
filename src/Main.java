@@ -11,9 +11,9 @@ import java.util.List;
  * MySQL 데이터베이스와의 연결을 설정하는 역할을 함
  */
 class DatabaseConnection {
-    private static final String URL = "jdbc:mysql://localhost:3306/";
+    private static final String URL = "jdbc:mysql://localhost:3306/mydb";
     private static final String USER = "root";
-    private static final String PASSWORD = "";
+    private static final String PASSWORD = "jsh00889600!";
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(URL, USER, PASSWORD);
