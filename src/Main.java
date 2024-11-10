@@ -1,9 +1,14 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
+import javax.swing.table.TableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -11,9 +16,9 @@ import java.util.List;
  * MySQL 데이터베이스와의 연결을 설정하는 역할을 함
  */
 class DatabaseConnection {
-    private static final String URL = "jdbc:mysql://localhost:3306/mydb";
+    private static final String URL = "jdbc:mysql://localhost:3306/database_project";
     private static final String USER = "root";
-    private static final String PASSWORD = "jsh00889600!";
+    private static final String PASSWORD = "0829";
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(URL, USER, PASSWORD);
@@ -38,6 +43,18 @@ public class Main extends JFrame {
     private JTextField projectNameField;
     private JButton projectSearchButton, projectAddButton, projectUpdateButton, projectDeleteButton;
 
+    //yong
+    private void toggleSortOrder(TableRowSorter<TableModel> sorter, int column) {
+        if (sorter.getSortKeys().isEmpty() || sorter.getSortKeys().get(0).getColumn() != column) {
+            sorter.setSortKeys(Arrays.asList(new RowSorter.SortKey(column, SortOrder.ASCENDING)));
+        } else {
+            RowSorter.SortKey sortKey = sorter.getSortKeys().get(0);
+            SortOrder order = sortKey.getSortOrder() == SortOrder.ASCENDING ? SortOrder.DESCENDING : SortOrder.ASCENDING;
+            sorter.setSortKeys(Arrays.asList(new RowSorter.SortKey(column, order)));
+        }
+    }
+    //~yong
+
     public Main() {
         setTitle("Information Retrieval System");
         setSize(1000, 600);
@@ -57,7 +74,22 @@ public class Main extends JFrame {
                 return column == 0; // 체크박스 컬럼만 수정 가능
             }
         };
+
         table = new JTable(model);
+
+        //yong
+        TableRowSorter<TableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+
+        table.getTableHeader().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int column = table.columnAtPoint(e.getPoint());
+
+                toggleSortOrder(sorter, column);
+            }
+        });
+        //~yong
 
         projectModel = new DefaultTableModel(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"}, 0) {
             @Override
