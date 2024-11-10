@@ -43,7 +43,7 @@ public class Main extends JFrame {
     private JTextField projectNameField;
     private JButton projectSearchButton, projectAddButton, projectUpdateButton, projectDeleteButton;
 
-    //yong
+    //yong : TableRowSorter 객체에서 Jtable 의 정렬 순서를 토글하여 오름차 또는 내림차로 보여줍니다.
     private void toggleSortOrder(TableRowSorter<TableModel> sorter, int column) {
         if (sorter.getSortKeys().isEmpty() || sorter.getSortKeys().get(0).getColumn() != column) {
             sorter.setSortKeys(Arrays.asList(new RowSorter.SortKey(column, SortOrder.ASCENDING)));
@@ -77,7 +77,7 @@ public class Main extends JFrame {
 
         table = new JTable(model);
 
-        //yong
+        //yong : TableRowSorter JTable에 데이터를 정렬하는 기능을 제공하는 클래스, MouseClick 이벤트를 따라 이벤트가 발생합니다.
         TableRowSorter<TableModel> sorter = new TableRowSorter<>(model);
         table.setRowSorter(sorter);
 
@@ -157,7 +157,7 @@ public class Main extends JFrame {
         // 프로젝트 관련 버튼
         // 프로젝트 검색 패널 설정
         JPanel projectSearchPanel = new JPanel(new FlowLayout());
-        projectSearchCategoryBox = new JComboBox<>(new String[]{"전체","프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"});
+        projectSearchCategoryBox = new JComboBox<>(new String[]{"전체","프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호", "프로젝트 당 작업시간"});
 
         projectNameField = new JTextField(10);
 
@@ -708,14 +708,43 @@ public class Main extends JFrame {
             FROM PROJECT p
             WHERE Dnum = ?;
         """;
+            // yong 작업시간을 구하는 쿼리입니다.
+            case "프로젝트 당 작업시간" -> query = """
+                    SELECT  p.Pname AS ProjectName,
+                            p.Pnumber AS ProjectNumber,
+                            p.Plocation AS ProjectLocation,
+                            p.Dnum AS DepartmentNumber,
+                            IFNULL(SUM(w.Hours), 0) AS TotalHours
+                    FROM    PROJECT p
+                    LEFT    JOIN works_on w ON p.Pnumber = w.Pno
+                    GROUP BY p.Pname, p.Pnumber, p.Plocation, p.Dnum;
+        """;
+            // ~yong
             default -> {
                 loadProjectData(); // 기본 데이터 로드 메서드
+
+                // yong : 전체를 클릭했을 시 다시 4열로 만들어줍니다.
+                projectModel.setColumnCount(4);
+                projectModel.setColumnIdentifiers(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"});
+                // ~yong
+
                 return;
             }
         }
 
         if (query != null) {
             projectModel.setRowCount(0); // 기존 데이터 초기화
+
+            // yong : 프로젝트 당 작업시간을 클릭하여 검색하였을 시 5열로 보이게 합니다. 그 외는 4열로 만듭니다.
+            if (category.equals("프로젝트 당 작업시간")) {
+                projectModel.setColumnCount(5);
+                projectModel.setColumnIdentifiers(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호", "작업시간"});
+            } else {
+                projectModel.setColumnCount(4);
+                projectModel.setColumnIdentifiers(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"});
+            }
+            // ~yong
+
             try (Connection conn = DatabaseConnection.getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(query)) {
 
@@ -738,12 +767,22 @@ public class Main extends JFrame {
                 // 쿼리 실행 및 결과 처리
                 ResultSet rs = pstmt.executeQuery();
                 while (rs.next()) {
-                    projectModel.addRow(new Object[]{
-                            rs.getString("ProjectName"),
-                            rs.getInt("ProjectNumber"),
-                            rs.getString("ProjectLocation"),
-                            rs.getInt("DepartmentNumber")
-                    });
+                    if (category.equals("프로젝트 당 작업시간")) {
+                        projectModel.addRow(new Object[]{
+                                rs.getString("ProjectName"),
+                                rs.getInt("ProjectNumber"),
+                                rs.getString("ProjectLocation"),
+                                rs.getInt("DepartmentNumber"),
+                                rs.getFloat("TotalHours") // yong
+                        });
+                    } else {    // yong : 5열일 때 가져오는 get 과 4열 일때 가져오는 get 을 구분하였습니다.
+                        projectModel.addRow(new Object[]{
+                                rs.getString("ProjectName"),
+                                rs.getInt("ProjectNumber"),
+                                rs.getString("ProjectLocation"),
+                                rs.getInt("DepartmentNumber")
+                        });
+                    }
                 }
             } catch (SQLException e) {
                 JOptionPane.showMessageDialog(this, "검색 중 오류가 발생했습니다.", "오류", JOptionPane.ERROR_MESSAGE);
