@@ -16,9 +16,9 @@ import java.util.List;
  * MySQL 데이터베이스와의 연결을 설정하는 역할을 함
  */
 class DatabaseConnection {
-    private static final String URL = "jdbc:mysql://localhost:3306/database_project";
+    private static final String URL = "jdbc:mysql://localhost:3306/databasebasic";
     private static final String USER = "root";
-    private static final String PASSWORD = "0829";
+    private static final String PASSWORD = "jjeongee1234";
 
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(URL, USER, PASSWORD);
@@ -30,8 +30,8 @@ class DatabaseConnection {
  * 직원 정보 조회, 검색, 삭제, 수정 및 추가 기능을 관리하는 메인 클래스
  */
 public class Main extends JFrame {
-    private JTable table;
-    private DefaultTableModel model;
+    private JTable employeeTable;
+    private DefaultTableModel employeeModel;
     private JComboBox<String> searchCategoryBox, groupByBox, departmentComboBox, genderComboBox, sortByBox;
     private JTextField salaryField;
     private JButton searchButton, deleteButton, addButton, updateButton;
@@ -43,25 +43,78 @@ public class Main extends JFrame {
     private JTextField projectNameField;
     private JButton projectSearchButton, projectAddButton, projectUpdateButton, projectDeleteButton;
 
-    //yong : TableRowSorter 객체에서 Jtable 의 정렬 순서를 토글하여 오름차 또는 내림차로 보여줍니다.
-    private void toggleSortOrder(TableRowSorter<TableModel> sorter, int column) {
-        if (sorter.getSortKeys().isEmpty() || sorter.getSortKeys().get(0).getColumn() != column) {
-            sorter.setSortKeys(Arrays.asList(new RowSorter.SortKey(column, SortOrder.ASCENDING)));
-        } else {
-            RowSorter.SortKey sortKey = sorter.getSortKeys().get(0);
-            SortOrder order = sortKey.getSortOrder() == SortOrder.ASCENDING ? SortOrder.DESCENDING : SortOrder.ASCENDING;
-            sorter.setSortKeys(Arrays.asList(new RowSorter.SortKey(column, order)));
-        }
-    }
+    private JTable dependentTable;
+    private DefaultTableModel dependentModel;
+    private JComboBox<String> dependentSearchCategoryBox;
+    private JTextField dependentSearchField;
+    private JButton dependentSearchButton, dependentAddButton, dependentUpdateButton, dependentDeleteButton;
+    private JPanel employeePanel;
+
     //~yong
 
     public Main() {
         setTitle("Information Retrieval System");
         setSize(1000, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // 직원 관리 패널 추가
+        JPanel employeePanel = createEmployeePanel();
+        tabbedPane.addTab("직원 관리", employeePanel);
+
+        // 프로젝트 관리 패널 추가
+        JPanel projectPanel = createProjectPanel();
+        tabbedPane.addTab("프로젝트 관리", projectPanel);
+
+        JPanel dependentPanel = createDependentPanel();
+        tabbedPane.addTab("부양가족 관리", dependentPanel);
+
+        add(tabbedPane, BorderLayout.CENTER);
+    }
+
+    private void loadEmployeeData() {
+        String query = """
+        SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name,
+               e.Ssn,
+               e.Bdate,
+               e.Address,
+               e.Sex,
+               e.Salary,
+               e.Super_ssn,
+               d.Dname AS Department,
+               COALESCE(SUM(w.Hours), 0) AS TotalHours
+        FROM EMPLOYEE e
+        JOIN DEPARTMENT d ON e.Dno = d.Dnumber
+        LEFT JOIN Works_on w ON e.Ssn = w.Essn
+        GROUP BY e.Ssn, e.Fname, e.Minit, e.Lname, e.Bdate, e.Address,
+                 e.Sex, e.Salary, e.Super_ssn, d.Dname;
+    """;
+
+        employeeModel.setRowCount(0);
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                employeeModel.addRow(new Object[]{
+                        false, rs.getString("Name"), rs.getString("Ssn"), rs.getDate("Bdate"),
+                        rs.getString("Address"), rs.getString("Sex"), rs.getDouble("Salary"),
+                        rs.getString("Super_ssn"), rs.getString("Department"),
+                        rs.getDouble("TotalHours") // 총 작업 시간을 포함
+                });
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private JPanel createEmployeePanel() {
+        employeeTable = new JTable(employeeModel);
+        employeePanel = new JPanel(new BorderLayout());
 
         // 테이블 모델 설정 및 첫 번째 컬럼에 체크박스 추가
-        model = new DefaultTableModel(new Object[]{"선택", "이름", "주민번호", "생년월일", "주소", "성별", "급여", "상사", "부서", "총 작업시간"}, 0) {
+        employeeModel = new DefaultTableModel(new Object[]{"선택", "이름", "주민번호", "생년월일", "주소", "성별", "급여", "상사", "부서", "총 작업시간"}, 0) {
             @Override
             public Class<?> getColumnClass(int columnIndex) {
                 if (columnIndex == 0) return Boolean.class; // 첫 번째 컬럼을 체크박스로 설정
@@ -74,23 +127,68 @@ public class Main extends JFrame {
                 return column == 0; // 체크박스 컬럼만 수정 가능
             }
         };
+        TableRowSorter<TableModel> sorter = new TableRowSorter<>(employeeModel);
+        employeeTable.setRowSorter(sorter);
 
-        table = new JTable(model);
-
-        //yong : TableRowSorter JTable에 데이터를 정렬하는 기능을 제공하는 클래스, MouseClick 이벤트를 따라 이벤트가 발생합니다.
-        TableRowSorter<TableModel> sorter = new TableRowSorter<>(model);
-        table.setRowSorter(sorter);
-
-        table.getTableHeader().addMouseListener(new MouseAdapter() {
+        employeeTable.getTableHeader().addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                int column = table.columnAtPoint(e.getPoint());
+                int column = employeeTable.columnAtPoint(e.getPoint());
 
                 toggleSortOrder(sorter, column);
             }
         });
-        //~yong
 
+        JPanel employeePanel = new JPanel(new BorderLayout());
+        // 검색 조건 패널 설정
+
+        searchCategoryBox = new JComboBox<>(new String[]{"전체", "부서", "성별", "급여", "주소", "상사 주민번호", "생년월일", "이름", "주민번호", "평균 월급"});
+        groupByBox = new JComboBox<>(new String[]{"그룹 없음", "성별", "부서", "상급자"});
+        departmentComboBox = new JComboBox<>(getDepartments()); // 부서 선택을 위한 콤보박스
+        genderComboBox = new JComboBox<>(new String[]{"M", "F"}); // 성별 선택을 위한 콤보박스
+        salaryField = new JTextField(10);
+        salaryField.setEnabled(false); // 검색 조건 필드는 기본적으로 비활성화
+
+        searchButton = new JButton("검색");
+        deleteButton = new JButton("선택된 직원 삭제");
+        addButton = new JButton("직원 추가");
+        updateButton = new JButton("직원 수정");
+
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.add(new JLabel("검색 범위:"));
+        searchPanel.add(searchCategoryBox);
+        searchPanel.add(new JLabel("그룹별 평균 월급:"));
+        searchPanel.add(groupByBox);
+        searchPanel.add(new JLabel("검색 조건:"));
+        searchPanel.add(departmentComboBox);
+        searchPanel.add(genderComboBox);
+        searchPanel.add(salaryField);
+        departmentComboBox.setEnabled(false); // 기본적으로 비활성화
+        genderComboBox.setEnabled(false); // 기본적으로 비활성화
+        salaryField.setEnabled(false);
+        groupByBox.setEnabled(false); // 기본적으로 비활성화
+
+        searchPanel.add(searchButton);
+        searchPanel.add(deleteButton);
+        searchPanel.add(addButton);
+        searchPanel.add(updateButton);
+        employeePanel.add(searchPanel, BorderLayout.NORTH);
+        employeePanel.add(new JScrollPane(employeeTable), BorderLayout.CENTER);
+
+        searchCategoryBox.addActionListener(e -> updateSearchOptions());
+        groupByBox.addActionListener(e -> updateSearchOptions());
+        searchButton.addActionListener(e -> searchEmployees());
+        deleteButton.addActionListener(e -> deleteEmployees());
+        addButton.addActionListener(e -> addEmployee());
+        updateButton.addActionListener(e -> updateEmployee());
+
+        loadEmployeeData();
+        return employeePanel;
+
+    }
+
+    private JPanel createProjectPanel() {
+        JPanel projectPanel = new JPanel(new BorderLayout());
         projectModel = new DefaultTableModel(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"}, 0) {
             @Override
             public Class<?> getColumnClass(int projectColumnIndex) {
@@ -102,54 +200,19 @@ public class Main extends JFrame {
                 return column == 0; // 체크박스 컬럼만 수정 가능
             }
         };
+        projectTable = new JTable(projectModel);
 
-        // 검색 조건 패널 설정
-        JPanel searchPanel = new JPanel(new FlowLayout());
-        searchCategoryBox = new JComboBox<>(new String[]{"전체", "부서", "성별", "급여", "주소", "상사 주민번호", "생년월일", "이름", "주민번호", "평균 월급"});
-        groupByBox = new JComboBox<>(new String[]{"그룹 없음", "성별", "부서", "상급자"});
-        departmentComboBox = new JComboBox<>(getDepartments()); // 부서 선택을 위한 콤보박스
-        genderComboBox = new JComboBox<>(new String[]{"M", "F"}); // 성별 선택을 위한 콤보박스
-//        sortByBox = new JComboBox<>(new String[]{"기본 정렬", "총 작업시간 정렬"}); // 정렬 기준 추가
-        salaryField = new JTextField(10);
-        salaryField.setEnabled(false); // 검색 조건 필드는 기본적으로 비활성화
+        // 정렬 기능 추가
+        TableRowSorter<TableModel> projectSorter = new TableRowSorter<>(projectModel);
+        projectTable.setRowSorter(projectSorter);
 
-        searchButton = new JButton("검색");
-        deleteButton = new JButton("선택된 직원 삭제");
-        addButton = new JButton("직원 추가");
-        updateButton = new JButton("직원 수정");
-
-        searchPanel.add(new JLabel("검색 범위:"));
-        searchPanel.add(searchCategoryBox);
-        searchPanel.add(new JLabel("그룹별 평균 월급:"));
-        searchPanel.add(groupByBox);
-        searchPanel.add(new JLabel("검색 조건:"));
-        searchPanel.add(departmentComboBox);
-        searchPanel.add(genderComboBox);
-        searchPanel.add(salaryField);
-//        searchPanel.add(new JLabel("정렬 기준:"));
-//        searchPanel.add(sortByBox);
-
-        departmentComboBox.setEnabled(false); // 기본적으로 비활성화
-        genderComboBox.setEnabled(false); // 기본적으로 비활성화
-        groupByBox.setEnabled(false); // 기본적으로 비활성화
-
-        searchPanel.add(searchButton);
-        searchPanel.add(deleteButton);
-        searchPanel.add(addButton);
-        searchPanel.add(updateButton);
-
-        add(searchPanel, BorderLayout.NORTH);
-        add(new JScrollPane(table), BorderLayout.CENTER);
-
-        searchCategoryBox.addActionListener(e -> updateSearchOptions());
-        groupByBox.addActionListener(e -> updateSearchOptions());
-
-
-        searchButton.addActionListener(e -> searchEmployees());
-        deleteButton.addActionListener(e -> deleteEmployees());
-        addButton.addActionListener(e -> addEmployee());
-        updateButton.addActionListener(e -> updateEmployee());
-
+        projectTable.getTableHeader().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int column = projectTable.columnAtPoint(e.getPoint());
+                toggleSortOrder(projectSorter, column);
+            }
+        });
         // 프로젝트 테이블 설정
         projectModel = new DefaultTableModel(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"}, 0);
         projectTable = new JTable(projectModel);
@@ -157,8 +220,7 @@ public class Main extends JFrame {
         // 프로젝트 관련 버튼
         // 프로젝트 검색 패널 설정
         JPanel projectSearchPanel = new JPanel(new FlowLayout());
-        projectSearchCategoryBox = new JComboBox<>(new String[]{"전체","프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호", "프로젝트 당 작업시간"});
-
+        projectSearchCategoryBox = new JComboBox<>(new String[]{"전체","프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"});
         projectNameField = new JTextField(10);
 
         projectSearchButton = new JButton("검색");
@@ -175,19 +237,310 @@ public class Main extends JFrame {
         projectSearchPanel.add(projectDeleteButton);
 
         // 프로젝트 패널 설정
-        JPanel projectPanel = new JPanel(new BorderLayout());
+        projectPanel = new JPanel(new BorderLayout());
         projectPanel.add(projectSearchPanel, BorderLayout.NORTH);
         projectPanel.add(new JScrollPane(projectTable), BorderLayout.CENTER);
-
-        add(projectPanel, BorderLayout.SOUTH);
-
         projectSearchButton.addActionListener(e -> searchProjects());
         projectAddButton.addActionListener(e -> addProject());
         projectUpdateButton.addActionListener(e -> updateProject());
         projectDeleteButton.addActionListener(e -> deleteProject());
 
-        loadEmployeeData();
         loadProjectData();
+        return projectPanel;
+
+
+    }
+
+    private JPanel createDependentPanel() {
+        JPanel dependentPanel = new JPanel(new BorderLayout());
+
+        // 테이블 모델 설정 및 첫 번째 컬럼에 체크박스 추가
+        dependentModel = new DefaultTableModel(new Object[]{"선택", "직원 주민번호", "부양가족 이름", "성별", "생년월일", "관계"}, 0) {
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex == 0) return Boolean.class; // 첫 번째 컬럼을 체크박스로 설정
+                return super.getColumnClass(columnIndex);
+            }
+
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 0; // 체크박스 컬럼만 수정 가능
+            }
+        };
+
+        dependentTable = new JTable(dependentModel);
+
+        // 정렬 기능 추가
+        TableRowSorter<TableModel> dependentSorter = new TableRowSorter<>(dependentModel);
+        dependentTable.setRowSorter(dependentSorter);
+
+        dependentTable.getTableHeader().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int column = dependentTable.columnAtPoint(e.getPoint());
+                toggleSortOrder(dependentSorter, column);
+            }
+        });
+
+        // 부양가족 검색 패널 설정
+        JPanel dependentSearchPanel = new JPanel(new FlowLayout());
+        dependentSearchCategoryBox = new JComboBox<>(new String[]{"전체", "직원 주민번호", "부양가족 이름", "성별", "생년월일", "관계"});
+
+        dependentSearchField = new JTextField(10);
+
+        dependentSearchButton = new JButton("검색");
+        dependentAddButton = new JButton("부양가족 추가");
+        dependentUpdateButton = new JButton("부양가족 수정");
+        dependentDeleteButton = new JButton("부양가족 삭제");
+
+        dependentSearchPanel.add(new JLabel("검색 기준:"));
+        dependentSearchPanel.add(dependentSearchCategoryBox);
+        dependentSearchPanel.add(dependentSearchField);
+        dependentSearchPanel.add(dependentSearchButton);
+        dependentSearchPanel.add(dependentAddButton);
+        dependentSearchPanel.add(dependentUpdateButton);
+        dependentSearchPanel.add(dependentDeleteButton);
+
+        dependentSearchButton.addActionListener(e -> searchDependents());
+        dependentAddButton.addActionListener(e -> addDependent());
+        dependentUpdateButton.addActionListener(e -> updateDependent());
+        dependentDeleteButton.addActionListener(e -> deleteDependents());
+
+        dependentPanel.add(dependentSearchPanel, BorderLayout.NORTH);
+        dependentPanel.add(new JScrollPane(dependentTable), BorderLayout.CENTER);
+
+        loadDependentData();
+
+        return dependentPanel;
+
+
+
+    }
+
+    private void loadDependentData() {
+        String query = "SELECT Essn, Dependent_name, Sex, Bdate, Relationship FROM DEPENDENT";
+
+        dependentModel.setRowCount(0);
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            while (rs.next()) {
+                dependentModel.addRow(new Object[]{
+                        false,
+                        rs.getString("Essn"),
+                        rs.getString("Dependent_name"),
+                        rs.getString("Sex"),
+                        rs.getDate("Bdate"),
+                        rs.getString("Relationship")
+                });
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void searchDependents() {
+        String category = dependentSearchCategoryBox.getSelectedItem().toString();
+        String searchText = dependentSearchField.getText().trim();
+        String query = null;
+
+        switch (category) {
+            case "직원 주민번호" -> query = "SELECT Essn, Dependent_name, Sex, Bdate, Relationship FROM DEPENDENT WHERE Essn = ?";
+            case "부양가족 이름" -> query = "SELECT Essn, Dependent_name, Sex, Bdate, Relationship FROM DEPENDENT WHERE Dependent_name LIKE ?";
+            case "성별" -> query = "SELECT Essn, Dependent_name, Sex, Bdate, Relationship FROM DEPENDENT WHERE Sex = ?";
+            case "생년월일" -> query = "SELECT Essn, Dependent_name, Sex, Bdate, Relationship FROM DEPENDENT WHERE Bdate = ?";
+            case "관계" -> query = "SELECT Essn, Dependent_name, Sex, Bdate, Relationship FROM DEPENDENT WHERE Relationship LIKE ?";
+            default -> {
+                loadDependentData();
+                return;
+            }
+        }
+
+        dependentModel.setRowCount(0);
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            switch (category) {
+                case "직원 주민번호", "성별" -> pstmt.setString(1, searchText);
+                case "부양가족 이름", "관계" -> pstmt.setString(1, "%" + searchText + "%");
+                case "생년월일" -> pstmt.setDate(1, Date.valueOf(searchText));
+            }
+
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                dependentModel.addRow(new Object[]{
+                        false,
+                        rs.getString("Essn"),
+                        rs.getString("Dependent_name"),
+                        rs.getString("Sex"),
+                        rs.getDate("Bdate"),
+                        rs.getString("Relationship")
+                });
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "검색 중 오류가 발생했습니다.", "오류", JOptionPane.ERROR_MESSAGE);
+        } catch (IllegalArgumentException e) {
+            JOptionPane.showMessageDialog(this, "올바른 날짜 형식 (YYYY-MM-DD)으로 입력하세요.", "입력 오류", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void addDependent() {
+        JTextField essnField = new JTextField();
+        JTextField dependentNameField = new JTextField();
+        JTextField sexField = new JTextField();
+        JTextField bdateField = new JTextField();
+        JTextField relationshipField = new JTextField();
+
+        JPanel panel = new JPanel(new GridLayout(5, 2));
+        panel.add(new JLabel("직원 주민번호:"));
+        panel.add(essnField);
+        panel.add(new JLabel("부양가족 이름:"));
+        panel.add(dependentNameField);
+        panel.add(new JLabel("성별 (M/F):"));
+        panel.add(sexField);
+        panel.add(new JLabel("생년월일 (YYYY-MM-DD):"));
+        panel.add(bdateField);
+        panel.add(new JLabel("관계:"));
+        panel.add(relationshipField);
+
+        int result = JOptionPane.showConfirmDialog(this, panel, "부양가족 추가", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            String query = "INSERT INTO DEPENDENT (Essn, Dependent_name, Sex, Bdate, Relationship) VALUES (?, ?, ?, ?, ?)";
+
+            try (Connection conn = DatabaseConnection.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+                pstmt.setString(1, essnField.getText().trim());
+                pstmt.setString(2, dependentNameField.getText().trim());
+                pstmt.setString(3, sexField.getText().trim());
+                pstmt.setDate(4, Date.valueOf(bdateField.getText().trim()));
+                pstmt.setString(5, relationshipField.getText().trim());
+
+                int rows = pstmt.executeUpdate();
+
+                if (rows > 0) {
+                    JOptionPane.showMessageDialog(this, "부양가족이 추가되었습니다.");
+                    loadDependentData();
+                } else {
+                    JOptionPane.showMessageDialog(this, "부양가족 추가에 실패했습니다.", "오류", JOptionPane.ERROR_MESSAGE);
+                }
+
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(this, "데이터베이스 오류: " + e.getMessage(), "오류", JOptionPane.ERROR_MESSAGE);
+            } catch (IllegalArgumentException e) {
+                JOptionPane.showMessageDialog(this, "올바른 날짜 형식 (YYYY-MM-DD)으로 입력하세요.", "입력 오류", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void updateDependent() {
+        int selectedRow = dependentTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "수정할 부양가족을 선택하세요.");
+            return;
+        }
+
+        String essn = dependentModel.getValueAt(selectedRow, 1).toString();
+        String dependentName = dependentModel.getValueAt(selectedRow, 2).toString();
+
+        JTextField sexField = new JTextField(dependentModel.getValueAt(selectedRow, 3).toString());
+        JTextField bdateField = new JTextField(dependentModel.getValueAt(selectedRow, 4).toString());
+        JTextField relationshipField = new JTextField(dependentModel.getValueAt(selectedRow, 5).toString());
+
+        JPanel panel = new JPanel(new GridLayout(3, 2));
+        panel.add(new JLabel("성별 (M/F):"));
+        panel.add(sexField);
+        panel.add(new JLabel("생년월일 (YYYY-MM-DD):"));
+        panel.add(bdateField);
+        panel.add(new JLabel("관계:"));
+        panel.add(relationshipField);
+
+        int result = JOptionPane.showConfirmDialog(this, panel, "부양가족 수정", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+
+        if (result == JOptionPane.OK_OPTION) {
+            String query = "UPDATE DEPENDENT SET Sex = ?, Bdate = ?, Relationship = ? WHERE Essn = ? AND Dependent_name = ?";
+
+            try (Connection conn = DatabaseConnection.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+                pstmt.setString(1, sexField.getText().trim());
+                pstmt.setDate(2, Date.valueOf(bdateField.getText().trim()));
+                pstmt.setString(3, relationshipField.getText().trim());
+                pstmt.setString(4, essn);
+                pstmt.setString(5, dependentName);
+
+                int rows = pstmt.executeUpdate();
+
+                if (rows > 0) {
+                    JOptionPane.showMessageDialog(this, "부양가족 정보가 수정되었습니다.");
+                    loadDependentData();
+                } else {
+                    JOptionPane.showMessageDialog(this, "수정할 부양가족 정보를 찾을 수 없습니다.", "오류", JOptionPane.ERROR_MESSAGE);
+                }
+
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(this, "데이터베이스 오류: " + e.getMessage(), "오류", JOptionPane.ERROR_MESSAGE);
+            } catch (IllegalArgumentException e) {
+                JOptionPane.showMessageDialog(this, "올바른 날짜 형식 (YYYY-MM-DD)으로 입력하세요.", "입력 오류", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void deleteDependents() {
+        List<String[]> dependentsToDelete = new ArrayList<>();
+
+        for (int i = 0; i < dependentModel.getRowCount(); i++) {
+            Boolean isSelected = (Boolean) dependentModel.getValueAt(i, 0);
+            if (isSelected) {
+                String essn = dependentModel.getValueAt(i, 1).toString();
+                String dependentName = dependentModel.getValueAt(i, 2).toString();
+                dependentsToDelete.add(new String[]{essn, dependentName});
+            }
+        }
+
+        if (dependentsToDelete.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "삭제할 부양가족을 선택하세요.");
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(this, "선택한 부양가족을 삭제하시겠습니까?", "삭제 확인", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        String query = "DELETE FROM DEPENDENT WHERE Essn = ? AND Dependent_name = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+                for (String[] dep : dependentsToDelete) {
+                    pstmt.setString(1, dep[0]);
+                    pstmt.setString(2, dep[1]);
+                    pstmt.addBatch();
+                }
+                pstmt.executeBatch();
+            }
+            conn.commit();
+            JOptionPane.showMessageDialog(this, "선택된 부양가족이 삭제되었습니다.");
+            loadDependentData();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "삭제 중 오류가 발생했습니다: " + e.getMessage(), "오류", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void toggleSortOrder(TableRowSorter<TableModel> sorter, int column) {
+        if (sorter.getSortKeys().isEmpty() || sorter.getSortKeys().get(0).getColumn() != column) {
+            sorter.setSortKeys(Arrays.asList(new RowSorter.SortKey(column, SortOrder.ASCENDING)));
+        } else {
+            RowSorter.SortKey sortKey = sorter.getSortKeys().get(0);
+            SortOrder order = sortKey.getSortOrder() == SortOrder.ASCENDING ? SortOrder.DESCENDING : SortOrder.ASCENDING;
+            sorter.setSortKeys(Arrays.asList(new RowSorter.SortKey(column, order)));
+        }
     }
 
     /**
@@ -237,48 +590,21 @@ public class Main extends JFrame {
      * 테이블의 열을 설정하는 메서드
      */
     private void setTableColumns() {
-        model.setColumnCount(0);
-        model.addColumn("선택");
-        if (nameBox.isSelected()) model.addColumn("이름");
-        if (ssnBox.isSelected()) model.addColumn("주민번호");
-        if (bdateBox.isSelected()) model.addColumn("생년월일");
-        if (addressBox.isSelected()) model.addColumn("주소");
-        if (sexBox.isSelected()) model.addColumn("성별");
-        if (salaryBox.isSelected()) model.addColumn("급여");
-        if (supervisorBox.isSelected()) model.addColumn("상사");
-        if (departmentBox.isSelected()) model.addColumn("부서");
+        employeeModel.setColumnCount(0);
+        employeeModel.addColumn("선택");
+        if (nameBox.isSelected()) employeeModel.addColumn("이름");
+        if (ssnBox.isSelected()) employeeModel.addColumn("주민번호");
+        if (bdateBox.isSelected()) employeeModel.addColumn("생년월일");
+        if (addressBox.isSelected()) employeeModel.addColumn("주소");
+        if (sexBox.isSelected()) employeeModel.addColumn("성별");
+        if (salaryBox.isSelected()) employeeModel.addColumn("급여");
+        if (supervisorBox.isSelected()) employeeModel.addColumn("상사");
+        if (departmentBox.isSelected()) employeeModel.addColumn("부서");
     }
 
     /**
      * 직원 데이터를 불러와 테이블에 표시하는 메서드
      */
-    private void loadEmployeeData() {
-        String query = """
-            SELECT CONCAT(e.Fname, ' ', e.Minit, ' ', e.Lname) AS Name, e.Ssn, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname AS Department, COALESCE(SUM(w.Hours), 0) AS TotalHours
-            FROM EMPLOYEE e
-            JOIN DEPARTMENT d ON e.Dno = d.Dnumber
-            LEFT JOIN Works_on w ON e.Ssn = w.Essn
-            GROUP BY e.Ssn, e.Fname, e.Minit, e.Lname, e.Bdate, e.Address, e.Sex, e.Salary, e.Super_ssn, d.Dname;
-            """;
-
-        model.setRowCount(0);
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-
-            while (rs.next()) {
-                model.addRow(new Object[]{
-                        false, rs.getString("Name"), rs.getString("Ssn"), rs.getDate("Bdate"),
-                        rs.getString("Address"), rs.getString("Sex"), rs.getDouble("Salary"),
-                        rs.getString("Super_ssn"), rs.getString("Department"),
-                        rs.getDouble("TotalHours") // 총 작업 시간을 포함
-                });
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
 
     /**
      * 조건에 따라 직원 데이터를 검색하고 테이블에 표시하는 메서드
@@ -376,36 +702,35 @@ public class Main extends JFrame {
         }
 
         if (query != null) {
-            model.setRowCount(0);
+            employeeModel.setRowCount(0);
             try (Connection conn = DatabaseConnection.getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(query)) {
 
-                if ("평균 월급".equals(category) && "상급자".equals(groupBy)) {
-                    pstmt.setString(1, salaryField.getText());
-                } else {
-                    switch (category) {
-                        case "부서" -> pstmt.setString(1, departmentComboBox.getSelectedItem().toString());
-                        case "성별" -> pstmt.setString(1, genderComboBox.getSelectedItem().toString());
-                        case "급여", "상사 주민번호", "생년월일", "이름", "주민번호" -> pstmt.setString(1, salaryField.getText());
-                        case "주소" -> pstmt.setString(1, "%" + salaryField.getText() + "%");
+                if ("평균 월급".equals(category) && !"그룹 없음".equals(groupBy)) {
+                    if ("상급자".equals(groupBy)) {
+                        employeeModel.setColumnIdentifiers(new Object[]{"선택", "상급자", "평균 급여"});
+                    } else if ("성별".equals(groupBy)) {
+                        employeeModel.setColumnIdentifiers(new Object[]{"선택", "성별", "평균 급여"});
+                    } else if ("부서".equals(groupBy)) {
+                        employeeModel.setColumnIdentifiers(new Object[]{"선택", "부서", "평균 급여"});
                     }
+                } else {
+                    // 기본 컬럼으로 재설정
+                    employeeModel.setColumnIdentifiers(new Object[]{"선택", "이름", "주민번호", "생년월일", "주소", "성별", "급여", "상사", "부서", "총 작업시간"});
                 }
+
+
 
                 ResultSet rs = pstmt.executeQuery();
                 while (rs.next()) {
                     if ("평균 월급".equals(category) && !"그룹 없음".equals(groupBy)) {
                         if ("상급자".equals(groupBy)) {
-                            model.addRow(new Object[]{false, rs.getString("Supervisor"), rs.getDouble("AvgSalary")});
+                            employeeModel.addRow(new Object[]{false, rs.getString("Supervisor"), rs.getDouble("AvgSalary")});
                         } else {
-                            model.addRow(new Object[]{false, rs.getString("GroupCategory"), rs.getDouble("AvgSalary")});
+                            employeeModel.addRow(new Object[]{false, rs.getString("GroupCategory"), rs.getDouble("AvgSalary")});
                         }
                     } else {
-                        model.addRow(new Object[]{
-                                false, rs.getString("Name"), rs.getString("Ssn"), rs.getDate("Bdate"),
-                                rs.getString("Address"), rs.getString("Sex"), rs.getDouble("Salary"),
-                                rs.getString("Super_ssn"), rs.getString("Department"),
-                                rs.getDouble("TotalHours")
-                        });
+                        // 기존 데이터 로드 부분 (생략)
                     }
                 }
             } catch (SQLException | NumberFormatException e) {
@@ -415,16 +740,17 @@ public class Main extends JFrame {
     }
 
 
+
     /**
      * 체크된 직원들을 삭제하는 메서드
      */
     private void deleteEmployees() {
         List<String> ssnsToDelete = new ArrayList<>();
 
-        for (int i = 0; i < model.getRowCount(); i++) {
-            Boolean isSelected = (Boolean) model.getValueAt(i, 0);
+        for (int i = 0; i < employeeModel.getRowCount(); i++) {
+            Boolean isSelected = (Boolean) employeeModel.getValueAt(i, 0);
             if (isSelected) {
-                String ssn = model.getValueAt(i, 2).toString();
+                String ssn = employeeModel.getValueAt(i, 2).toString();
                 ssnsToDelete.add(ssn);
             }
         }
@@ -531,21 +857,21 @@ public class Main extends JFrame {
      * 선택된 직원의 정보를 수정하는 메서드
      */
     private void updateEmployee() {
-        int selectedRow = table.getSelectedRow();
+        int selectedRow = employeeTable.getSelectedRow();
         if (selectedRow == -1) {
             JOptionPane.showMessageDialog(this, "수정할 직원을 선택하세요.");
             return;
         }
 
-        JTextField fNameField = new JTextField(model.getValueAt(selectedRow, 1).toString());
-        JTextField bDateField = new JTextField(model.getValueAt(selectedRow, 3).toString());
-        JTextField addressField = new JTextField(model.getValueAt(selectedRow, 4).toString());
-        JTextField sexField = new JTextField(model.getValueAt(selectedRow, 5).toString());
-        JTextField salaryField = new JTextField(model.getValueAt(selectedRow, 6).toString());
-        JTextField superSsnField = new JTextField(model.getValueAt(selectedRow, 7).toString());
+        JTextField fNameField = new JTextField(employeeModel.getValueAt(selectedRow, 1).toString());
+        JTextField bDateField = new JTextField(employeeModel.getValueAt(selectedRow, 3).toString());
+        JTextField addressField = new JTextField(employeeModel.getValueAt(selectedRow, 4).toString());
+        JTextField sexField = new JTextField(employeeModel.getValueAt(selectedRow, 5).toString());
+        JTextField salaryField = new JTextField(employeeModel.getValueAt(selectedRow, 6).toString());
+        JTextField superSsnField = new JTextField(employeeModel.getValueAt(selectedRow, 7).toString());
 
         JComboBox<String> dnoComboBox = new JComboBox<>(getDepartments());
-        dnoComboBox.setSelectedItem(model.getValueAt(selectedRow, 8).toString());
+        dnoComboBox.setSelectedItem(employeeModel.getValueAt(selectedRow, 8).toString());
 
         JPanel panel = new JPanel(new GridLayout(7, 2));
         panel.add(new JLabel("이름:"));
@@ -608,7 +934,7 @@ public class Main extends JFrame {
                         pstmt.setDouble(5, salary);
                         pstmt.setString(6, superSsnField.getText().trim());
                         pstmt.setInt(7, departmentNumber);
-                        pstmt.setString(8, model.getValueAt(selectedRow, 2).toString().trim());
+                        pstmt.setString(8, employeeModel.getValueAt(selectedRow, 2).toString().trim());
 
                         int rows = pstmt.executeUpdate();
                         if (rows > 0) {
@@ -648,8 +974,13 @@ public class Main extends JFrame {
     }
 
     private void loadProjectData() {
-        String query = "SELECT Pname, Pnumber, Plocation, Dnum FROM PROJECT"; // 프로젝트 데이터 쿼리
-
+        String query = """
+        SELECT Pname AS ProjectName,
+           Pnumber AS ProjectNumber,
+           Plocation AS ProjectLocation,
+           Dnum AS DepartmentNumber
+        FROM PROJECT
+    """;
         projectModel.setRowCount(0); // 기존 데이터 초기화
 
         try (Connection conn = DatabaseConnection.getConnection();
@@ -657,19 +988,18 @@ public class Main extends JFrame {
              ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
-                Object[] row = {
-//                        false,
-                        rs.getString("Pname"),
-                        rs.getInt("Pnumber"),
-                        rs.getString("Plocation"),
-                        rs.getInt("Dnum")
-                };
-                projectModel.addRow(row);
+                projectModel.addRow(new Object[] {
+                        rs.getString("ProjectName"),
+                        rs.getInt("ProjectNumber"),
+                        rs.getString("ProjectLocation"),
+                        rs.getInt("DepartmentNumber")
+                });
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
+
 
     private void searchProjects() {
         String category = projectSearchCategoryBox.getSelectedItem().toString(); // 선택된 검색 기준
@@ -708,43 +1038,14 @@ public class Main extends JFrame {
             FROM PROJECT p
             WHERE Dnum = ?;
         """;
-            // yong 작업시간을 구하는 쿼리입니다.
-            case "프로젝트 당 작업시간" -> query = """
-                    SELECT  p.Pname AS ProjectName,
-                            p.Pnumber AS ProjectNumber,
-                            p.Plocation AS ProjectLocation,
-                            p.Dnum AS DepartmentNumber,
-                            IFNULL(SUM(w.Hours), 0) AS TotalHours
-                    FROM    PROJECT p
-                    LEFT    JOIN works_on w ON p.Pnumber = w.Pno
-                    GROUP BY p.Pname, p.Pnumber, p.Plocation, p.Dnum;
-        """;
-            // ~yong
             default -> {
                 loadProjectData(); // 기본 데이터 로드 메서드
-
-                // yong : 전체를 클릭했을 시 다시 4열로 만들어줍니다.
-                projectModel.setColumnCount(4);
-                projectModel.setColumnIdentifiers(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"});
-                // ~yong
-
                 return;
             }
         }
 
         if (query != null) {
             projectModel.setRowCount(0); // 기존 데이터 초기화
-
-            // yong : 프로젝트 당 작업시간을 클릭하여 검색하였을 시 5열로 보이게 합니다. 그 외는 4열로 만듭니다.
-            if (category.equals("프로젝트 당 작업시간")) {
-                projectModel.setColumnCount(5);
-                projectModel.setColumnIdentifiers(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호", "작업시간"});
-            } else {
-                projectModel.setColumnCount(4);
-                projectModel.setColumnIdentifiers(new Object[]{"프로젝트 이름", "프로젝트 번호", "프로젝트 위치", "부서 번호"});
-            }
-            // ~yong
-
             try (Connection conn = DatabaseConnection.getConnection();
                  PreparedStatement pstmt = conn.prepareStatement(query)) {
 
@@ -767,22 +1068,12 @@ public class Main extends JFrame {
                 // 쿼리 실행 및 결과 처리
                 ResultSet rs = pstmt.executeQuery();
                 while (rs.next()) {
-                    if (category.equals("프로젝트 당 작업시간")) {
-                        projectModel.addRow(new Object[]{
-                                rs.getString("ProjectName"),
-                                rs.getInt("ProjectNumber"),
-                                rs.getString("ProjectLocation"),
-                                rs.getInt("DepartmentNumber"),
-                                rs.getFloat("TotalHours") // yong
-                        });
-                    } else {    // yong : 5열일 때 가져오는 get 과 4열 일때 가져오는 get 을 구분하였습니다.
-                        projectModel.addRow(new Object[]{
-                                rs.getString("ProjectName"),
-                                rs.getInt("ProjectNumber"),
-                                rs.getString("ProjectLocation"),
-                                rs.getInt("DepartmentNumber")
-                        });
-                    }
+                    projectModel.addRow(new Object[]{
+                            rs.getString("ProjectName"),
+                            rs.getInt("ProjectNumber"),
+                            rs.getString("ProjectLocation"),
+                            rs.getInt("DepartmentNumber")
+                    });
                 }
             } catch (SQLException e) {
                 JOptionPane.showMessageDialog(this, "검색 중 오류가 발생했습니다.", "오류", JOptionPane.ERROR_MESSAGE);
