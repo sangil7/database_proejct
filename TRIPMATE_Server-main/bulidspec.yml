@@ -1,0 +1,27 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "Installing dependencies"
+      - yum install -y nodejs
+      - npm install -g aws-cli
+      - chmod +x ./gradlew
+
+  pre_build:
+    commands:
+      - echo "Starting pre-build phase"
+      - aws --version
+  build:
+    commands:
+      - echo "Building the project"
+      - ./gradlew clean build -x test
+  post_build:
+    commands:
+      - echo "Build completed"
+      - echo "Copying JAR file to S3"
+      - aws s3 cp build/libs/tripmate-0.0.1-SNAPSHOT.jar s3://tripmate-bucket/
+
+artifacts:
+  files:
+    - build/libs/tripmate-0.0.1-SNAPSHOT.jar
